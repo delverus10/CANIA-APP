@@ -1,0 +1,1517 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CANIA - Sistema de Logística Clínica</title>
+  
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            cania: { blue: '#00457C', orange: '#F38B2B', orangeHover: '#d9761e', green: '#10b981', vital: '#ef4444', esencial: '#3b82f6', deseable: '#10b981' }
+          }
+        }
+      }
+    }
+  </script>
+  
+  <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+  <style>
+    body { background-color: #f8fafc; }
+    .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px;}
+    .custom-scrollbar::-webkit-scrollbar-thumb { background-color: #cbd5e1; border-radius: 10px; }
+    input[type="number"]::-webkit-inner-spin-button, 
+    input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+    
+    /* Estilo para tablas compactas (RPT1 Pro) */
+    .table-pro th { padding: 0.5rem; border: 1px solid #e2e8f0; background-color: #f1f5f9; font-size: 0.7rem; letter-spacing: 0.05em; text-transform: uppercase; color: #475569;}
+    .table-pro td { padding: 0.5rem; border: 1px solid #e2e8f0; font-size: 0.75rem; color: #334155; }
+    .table-pro tr:hover td { background-color: #f8fafc; }
+  </style>
+</head>
+<body class="text-gray-800 font-sans h-screen flex overflow-hidden">
+
+  <div id="app" class="flex w-full h-full">
+    
+    <!-- SIDEBAR COLAPSABLE -->
+    <aside :class="sidebarAbierto ? 'w-64' : 'w-0'" class="flex-shrink-0 bg-cania-blue text-white transition-[width] duration-300 ease-in-out overflow-hidden shadow-xl z-20 relative">
+      <div class="w-64 flex flex-col h-full absolute top-0 left-0">
+        <div class="p-6 text-center border-b border-blue-800 flex justify-between items-center">
+          <div class="flex items-center gap-2">
+            <i class="fa-solid fa-person-breastfeeding text-3xl text-cania-orange"></i>
+            <h1 class="text-2xl font-black tracking-tighter">CAN<span class="text-cania-orange">IA</span></h1>
+          </div>
+          <button @click="sidebarAbierto = false" class="text-blue-300 hover:text-white"><i class="fa-solid fa-chevron-left"></i></button>
+        </div>
+        <nav class="flex-1 p-4 space-y-2 overflow-y-auto">
+          <button @click="vistaActiva = 'INVENTARIO'" :class="{'bg-cania-orange text-white font-bold shadow-lg': vistaActiva === 'INVENTARIO', 'hover:bg-blue-800 text-blue-100': vistaActiva !== 'INVENTARIO'}" class="w-full flex items-center p-3 rounded-lg transition-all text-left text-sm">
+            <i class="fa-solid fa-boxes-stacked w-6"></i><span class="ml-2">Inventario Almacén PAN</span>
+          </button>
+          
+          <button @click="vistaActiva = 'POS'" :class="{'bg-cania-orange text-white font-bold shadow-lg': vistaActiva === 'POS', 'hover:bg-blue-800 text-blue-100': vistaActiva !== 'POS'}" class="w-full flex items-center p-3 rounded-lg transition-all text-left text-sm">
+            <i class="fa-solid fa-hand-holding-medical w-6"></i><span class="ml-2">Punto de Entrega</span>
+          </button>
+          
+          <button @click="vistaActiva = 'INGRESO'" :class="{'bg-cania-green text-white font-bold shadow-lg': vistaActiva === 'INGRESO', 'hover:bg-blue-800 text-blue-100': vistaActiva !== 'INGRESO'}" class="w-full flex items-center p-3 rounded-lg transition-all text-left text-sm">
+            <i class="fa-solid fa-truck-ramp-box w-6"></i><span class="ml-2">Ingresar Inventario</span>
+          </button>
+          
+          <button @click="vistaActiva = 'PLANIFICACION'" :class="{'bg-blue-600 text-white font-bold shadow-lg': vistaActiva === 'PLANIFICACION', 'hover:bg-blue-800 text-blue-100': vistaActiva !== 'PLANIFICACION'}" class="w-full flex items-center p-3 rounded-lg transition-all text-left text-sm">
+            <i class="fa-solid fa-calculator w-6"></i><span class="ml-2">Control de Stock (VED)</span>
+          </button>
+
+          <button @click="vistaActiva = 'DASHBOARD'" :class="{'bg-cania-orange text-white font-bold shadow-lg': vistaActiva === 'DASHBOARD', 'hover:bg-blue-800 text-blue-100': vistaActiva !== 'DASHBOARD'}" class="w-full flex items-center p-3 rounded-lg transition-all text-left text-sm">
+            <i class="fa-solid fa-chart-pie w-6"></i><span class="ml-2">Afluencia y Consumos</span>
+          </button>
+
+          <div class="pt-4 pb-2">
+            <p class="text-[10px] text-blue-300 font-bold uppercase tracking-wider mb-2">Finanzas & Reportes</p>
+            <button @click="vistaActiva = 'CRONICOS'" :class="{'bg-emerald-600 text-white font-bold shadow-lg': vistaActiva === 'CRONICOS', 'hover:bg-blue-800 text-blue-100': vistaActiva !== 'CRONICOS'}" class="w-full flex items-center p-3 rounded-lg transition-all text-left text-sm">
+              <i class="fa-solid fa-file-invoice-dollar w-6"></i><span class="ml-2">Análisis Pacientes Crónicos</span>
+            </button>
+          </div>
+        </nav>
+      </div>
+    </aside>
+
+    <!-- MAIN CONTENT -->
+    <main class="flex-1 flex flex-col h-full bg-slate-50 relative overflow-y-auto custom-scrollbar">
+      
+      <div v-if="cargando" class="absolute inset-0 bg-white/90 z-[300] flex flex-col items-center justify-center backdrop-blur-md">
+        <i class="fa-solid fa-spinner fa-spin text-5xl text-cania-orange mb-4"></i>
+        <p class="text-xl font-bold text-cania-blue">Sincronizando Sistema...</p>
+      </div>
+
+      <div v-show="vistaActiva === 'INVENTARIO'" class="p-6 h-full flex flex-col">
+        <header class="mb-4 border-b border-slate-200 pb-4 flex items-center">
+          <button @click="sidebarAbierto = !sidebarAbierto" class="mr-4 text-slate-400 hover:text-cania-blue transition-colors" title="Alternar Menú"><i class="fa-solid fa-bars text-2xl"></i></button>
+          <div>
+            <h2 class="text-2xl font-black text-cania-blue">Inventario Almacén PAN</h2>
+            <p class="text-xs font-bold text-slate-500">Módulo de visualización clínica. Nombres físicos de medicamentos.</p>
+          </div>
+        </header>
+
+        <!-- FILTROS AVANZADOS INVENTARIO (Multi-Medicamento) -->
+        <div class="bg-white p-4 rounded-xl border border-slate-200 mb-4 shadow-sm flex flex-col md:flex-row gap-4 relative z-30">
+          <div class="flex-1 relative">
+             <label class="block text-xs font-bold text-slate-500 mb-1 uppercase tracking-wide">Buscar / Filtrar Múltiples Medicamentos</label>
+             <div class="min-h-[38px] bg-slate-50 border border-slate-300 rounded-lg p-1.5 flex flex-wrap gap-1.5 items-center cursor-text">
+               <i class="fa-solid fa-search text-slate-400 ml-1 mr-1"></i>
+               <span v-for="(med, idx) in filtroInvMedicamentos" :key="idx" class="bg-cania-blue text-white text-[10px] font-bold px-2 py-1 rounded flex items-center gap-1 shadow-sm">
+                 {{ med }} <i class="fa-solid fa-times cursor-pointer hover:text-red-300" @click.stop="filtroInvMedicamentos.splice(idx, 1)"></i>
+               </span>
+               <input type="text" v-model="busquedaInvMedicamento" placeholder="Buscar medicamento o nro de lote..." class="flex-1 text-sm bg-transparent outline-none min-w-[180px]" @focus="dropdownInvMedicamentosAbierto = true">
+             </div>
+             
+             <div v-if="dropdownInvMedicamentosAbierto" class="fixed inset-0 z-40" @click="dropdownInvMedicamentosAbierto = false"></div>
+             
+             <div v-if="dropdownInvMedicamentosAbierto" class="absolute top-full left-0 w-full bg-white border border-slate-200 shadow-xl rounded-lg max-h-56 overflow-y-auto z-50 mt-1">
+                <div v-for="m in opcionesMedicamentosInv" :key="m" @click="toggleFiltroInvMedicamento(m)" class="p-2.5 text-sm hover:bg-blue-50 cursor-pointer flex justify-between items-center border-b border-slate-50 last:border-0">
+                  <span class="text-slate-700 font-semibold text-xs">{{ m }}</span>
+                  <i v-if="filtroInvMedicamentos.includes(m)" class="fa-solid fa-check text-cania-orange"></i>
+                </div>
+                <div v-if="opcionesMedicamentosInv.length === 0" class="p-4 text-center text-slate-400 text-xs">No hay coincidencias.</div>
+             </div>
+          </div>
+          
+          <div class="w-full md:w-64">
+             <label class="block text-xs font-bold text-slate-500 mb-1 uppercase tracking-wide">Estado de Lote</label>
+             <select v-model="filtroVistaEstado" class="w-full h-[38px] px-3 bg-slate-50 border border-slate-300 rounded-lg text-sm font-bold text-slate-700 outline-none">
+                <option value="">Todos los Estados</option>
+                <option value="VIGENTE">Vigentes</option>
+                <option value="PRÓXIMOS A VENCER">Próximos a Vencer</option>
+                <option value="EXPIRADO">Expirados</option>
+             </select>
+          </div>
+        </div>
+
+        <div class="flex-1 bg-white border border-slate-200 rounded-xl overflow-hidden flex flex-col shadow-sm relative z-10">
+          <div class="overflow-x-auto flex-1 custom-scrollbar">
+            <table class="w-full text-left text-xs">
+              <thead class="bg-slate-100 text-slate-600 uppercase sticky top-0 z-10 shadow-sm border-b">
+                <tr>
+                  <th class="p-3 font-bold">Descripción Clínica / Fisiológica</th>
+                  <th class="p-3 font-bold text-center">Lote</th>
+                  <th class="p-3 font-bold text-center">Vencimiento</th>
+                  <th class="p-3 font-bold text-center">Estado</th>
+                  <th class="p-3 font-bold text-center">Total Disp.</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-slate-100">
+                <tr v-for="item in inventarioFiltradoFarmacia" :key="item.lote + item.nombre" class="hover:bg-slate-50 transition-colors">
+                  <td class="p-3 font-semibold text-slate-700">{{ item.nombre }}</td>
+                  <td class="p-3 font-bold text-cania-blue text-center">{{ item.lote }}</td>
+                  <td class="p-3 text-slate-600 text-center">{{ item.vencimiento }}</td>
+                  <td class="p-3 text-center">
+                     <span class="px-2 py-1 rounded text-[10px] font-black uppercase tracking-wider" 
+                           :class="{'bg-emerald-100 text-emerald-700': item.estado === 'VIGENTE', 'bg-amber-100 text-amber-700': item.estado === 'PRÓXIMOS A VENCER', 'bg-red-100 text-red-700': item.estado === 'EXPIRADO'}">
+                        {{ item.estado }}
+                     </span>
+                  </td>
+                  <td class="p-3 text-center font-black text-sm" :class="{'text-red-500': item.cantidad === 0}">{{ item.cantidad }}</td>
+                </tr>
+                <tr v-if="inventarioFiltradoFarmacia.length === 0">
+                   <td colspan="5" class="p-8 text-center text-slate-400 font-medium">No se encontraron medicamentos o lotes.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- VISTA 1: PUNTO DE VENTA -->
+      <div v-show="vistaActiva === 'POS'" class="p-6 h-full flex flex-col">
+        <header class="mb-6 border-b border-slate-200 pb-4 flex justify-between items-center">
+          <div class="flex items-center">
+             <button @click="sidebarAbierto = !sidebarAbierto" class="mr-4 text-slate-400 hover:text-cania-orange transition-colors" title="Alternar Menú"><i class="fa-solid fa-bars text-2xl"></i></button>
+             <h2 class="text-2xl font-black text-cania-blue">Registrar Nuevo Consumo</h2>
+          </div>
+          <div class="flex items-center gap-2 bg-white px-3 py-1.5 rounded-lg border border-slate-200 shadow-sm">
+             <i class="fa-regular fa-calendar text-cania-orange"></i>
+             <label class="text-xs font-bold text-slate-500 uppercase">Fecha Entrega:</label>
+             <input type="date" v-model="fechaEntregaGlobal" class="text-sm font-bold text-slate-800 outline-none">
+          </div>
+        </header>
+
+        <div class="flex gap-6 flex-1 min-h-0">
+          <div class="w-2/3 flex flex-col gap-4">
+            
+            <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm relative z-50">
+              <div class="flex justify-between items-center mb-2">
+                <label class="block text-sm font-bold text-slate-700">1. Buscar Paciente (Triaje o Nombre)</label>
+                <button @click="mostrarModalPaciente = true" class="text-xs bg-orange-100 hover:bg-orange-200 text-cania-orangeHover font-bold py-1.5 px-3 rounded flex items-center shadow-sm">
+                  <i class="fa-solid fa-plus mr-1"></i> Nuevo
+                </button>
+              </div>
+              
+              <div class="relative">
+                <i class="fa-solid fa-user absolute left-3 top-3.5 text-slate-400"></i>
+                <input v-model="busquedaPaciente" type="text" placeholder="Ej. 105826 o SALCEDO..." class="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg outline-none focus:border-cania-orange">
+                
+                <div v-if="busquedaPaciente.length > 1 && !pacienteSeleccionado" class="absolute left-0 top-full mt-1 w-full bg-white border border-slate-200 rounded-lg max-h-48 overflow-y-auto shadow-2xl z-[100]">
+                  <div v-for="paciente in pacientesFiltrados" :key="paciente[0]" @click="seleccionarPaciente(paciente)" class="p-3 hover:bg-blue-50 cursor-pointer border-b border-slate-100 flex justify-between items-center">
+                    <div>
+                      <p class="font-bold text-slate-800">{{ paciente[1] }} {{ paciente[2] }}</p>
+                      <p class="text-xs text-slate-500">Triaje: {{ paciente[0] }} | Tipo: {{ normalizarTipo(paciente[3]) }}</p>
+                    </div>
+                    <span class="px-2 py-1 bg-cania-blue text-white rounded-full text-xs font-bold">{{ normalizarTipo(paciente[3]) }}</span>
+                  </div>
+                </div>
+              </div>
+
+              <div v-if="pacienteSeleccionado" class="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg flex justify-between items-center">
+                <div class="flex items-center gap-3">
+                  <div class="w-10 h-10 bg-cania-blue rounded-full flex items-center justify-center text-white font-bold">{{ pacienteSeleccionado.nombreCompleto.charAt(0) }}</div>
+                  <div>
+                    <p class="font-black text-cania-blue">{{ pacienteSeleccionado.nombreCompleto }}</p>
+                    <p class="text-xs text-blue-800 font-medium">{{ normalizarTipo(pacienteSeleccionado.tipo) }} | Nx: {{ pacienteSeleccionado.diagnosticoNx || 'N/A' }} | As: {{ pacienteSeleccionado.diagnosticoAs || 'N/A' }}</p>
+                  </div>
+                </div>
+                <button @click="pacienteSeleccionado = null; busquedaPaciente = ''" class="text-red-500 hover:text-red-700 p-2"><i class="fa-solid fa-times text-lg"></i></button>
+              </div>
+            </div>
+
+            <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex-1 flex flex-col min-h-0 relative z-10">
+              <label class="block text-sm font-bold text-slate-700 mb-2">2. Agregar Productos</label>
+              <div class="relative mb-4">
+                <i class="fa-solid fa-search absolute left-3 top-3.5 text-slate-400"></i>
+                <input v-model="busquedaInventario" type="text" placeholder="Buscar medicamento o producto..." class="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg outline-none focus:border-cania-orange animate-pulse">
+              </div>
+              <div class="flex-1 overflow-y-auto custom-scrollbar grid grid-cols-2 md:grid-cols-3 gap-3 pr-2">
+                <div v-for="grupo in inventarioAgrupadoFiltrado" :key="grupo.nombre" @click="abrirModalLotes(grupo)" class="bg-slate-50 p-3 rounded-lg border border-slate-200 hover:border-cania-orange hover:shadow-md cursor-pointer text-center transition-all flex flex-col justify-center">
+                  <div class="w-10 h-10 bg-white rounded-full flex items-center justify-center text-cania-blue mx-auto mb-2 shadow-sm"><i class="fa-solid fa-pills text-lg"></i></div>
+                  <p class="text-xs font-bold text-slate-800 line-clamp-2 leading-tight">{{ grupo.nombre }}</p>
+                  <p class="text-[10px] text-slate-500 mt-1 font-semibold">Disp: {{ grupo.cantidadTotal }}</p>
+                </div>
+              </div>
+            </div>
+
+          </div>
+
+          <!-- RESUMEN CARRITO -->
+          <div class="w-1/3 bg-white rounded-xl border border-slate-200 flex flex-col overflow-hidden shadow-lg relative z-10">
+            <div class="bg-cania-blue text-white p-4 text-center font-black text-lg flex items-center justify-center gap-2">
+              <i class="fa-solid fa-receipt"></i> Resumen de Salida
+            </div>
+            
+            <div class="flex-1 p-4 overflow-y-auto custom-scrollbar bg-white">
+              <div v-if="carrito.length === 0" class="h-full flex flex-col items-center justify-center text-slate-400 opacity-70">
+                <i class="fa-solid fa-basket-shopping text-5xl mb-3"></i>
+                <p class="text-sm font-medium">Carrito vacío</p>
+              </div>
+              <ul class="space-y-3">
+                <li v-for="(prod, index) in carrito" :key="index" class="p-3 bg-slate-50 rounded-lg border border-slate-200 flex justify-between items-center group">
+                  <div class="flex-1 pr-2">
+                     <p class="text-sm font-bold text-slate-800 leading-tight">{{ prod.nombre }}</p>
+                     <p class="text-[10px] font-bold text-slate-500 mt-0.5"><i class="fa-solid fa-box text-slate-400"></i> Lote: {{ prod.lote }}</p>
+                  </div>
+                  <div class="flex items-center bg-white border rounded-lg shadow-sm">
+                    <button @click="restarCantidad(index)" class="px-2 py-1 text-slate-500 hover:bg-slate-100"><i class="fa-solid fa-minus text-xs"></i></button>
+                    <span class="px-2 font-black text-sm text-cania-blue">{{ prod.cantidad }}</span>
+                    <button @click="sumarCantidad(index)" class="px-2 py-1 text-slate-500 hover:bg-slate-100"><i class="fa-solid fa-plus text-xs"></i></button>
+                  </div>
+                  <button @click="quitarDelCarrito(index)" class="ml-2 text-red-400 hover:text-red-600 p-1"><i class="fa-solid fa-trash"></i></button>
+                </li>
+              </ul>
+            </div>
+
+            <div class="p-4 bg-slate-100 border-t border-slate-300">
+              <div class="mb-4 bg-white p-3 rounded-lg border border-slate-200">
+                <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Modalidad de Entrega:</label>
+                <div class="flex gap-4 mt-2">
+                  <label class="flex items-center gap-2 cursor-pointer">
+                    <input type="radio" v-model="modalidadEntrega" value="NO" class="w-4 h-4 text-cania-orange">
+                    <span class="text-sm font-bold text-slate-700">Presencial</span>
+                  </label>
+                  <label class="flex items-center gap-2 cursor-pointer">
+                    <input type="radio" v-model="modalidadEntrega" value="SI" class="w-4 h-4 text-cania-orange">
+                    <span class="text-sm font-bold text-slate-700">A distancia</span>
+                  </label>
+                </div>
+              </div>
+
+              <button @click="abrirConfirmacion" :disabled="carrito.length === 0 || !pacienteSeleccionado || procesando" class="w-full bg-cania-orange hover:bg-cania-orangeHover text-white font-black py-3 rounded-xl disabled:opacity-50 transition-colors shadow-md flex items-center justify-center">
+                <i v-if="procesando" class="fa-solid fa-spinner fa-spin mr-2"></i>
+                <i v-else class="fa-solid fa-check-double mr-2"></i>
+                <span>{{ procesando ? 'Procesando...' : 'Generar Entrega' }}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div v-show="vistaActiva === 'PLANIFICACION'" class="p-6 h-full flex flex-col">
+        <header class="mb-4 border-b border-slate-200 pb-4 flex justify-between items-center">
+          <div class="flex items-center">
+             <button @click="sidebarAbierto = !sidebarAbierto" class="mr-4 text-slate-400 hover:text-blue-600 transition-colors" title="Alternar Menú"><i class="fa-solid fa-bars text-2xl"></i></button>
+             <div>
+               <h2 class="text-2xl font-black text-blue-700 flex items-center"><i class="fa-solid fa-calculator mr-3"></i>Abastecimiento y Revisión Continua</h2>
+               <p class="text-sm text-slate-500 font-medium">Módulo Logístico de Ingeniería VED. Precisión algorítmica.</p>
+             </div>
+          </div>
+          <div class="flex gap-2">
+             <button @click="radarFefoAbierto = !radarFefoAbierto" class="px-3 py-1.5 bg-orange-100 text-orange-800 text-xs font-bold rounded-lg hover:bg-orange-200 transition-colors flex items-center">
+                <i class="fa-solid" :class="radarFefoAbierto ? 'fa-eye-slash' : 'fa-eye'"></i> <span class="ml-1">Radar FEFO</span>
+             </button>
+             <button @click="leyendaVedAbierta = !leyendaVedAbierta" class="px-3 py-1.5 bg-slate-200 text-slate-700 text-xs font-bold rounded-lg hover:bg-slate-300 transition-colors flex items-center">
+                <i class="fa-solid fa-circle-info mr-1"></i> Fórmulas y Leyenda
+             </button>
+          </div>
+        </header>
+
+        <!-- PANEL DE LEYENDA (COLAPSABLE) -->
+        <div v-if="leyendaVedAbierta" class="bg-slate-800 text-slate-200 p-4 rounded-xl mb-4 text-xs flex gap-6 shadow-inner relative">
+           <button @click="leyendaVedAbierta = false" class="absolute top-2 right-2 text-slate-400 hover:text-white"><i class="fa-solid fa-times"></i></button>
+           <div class="flex-1">
+             <h4 class="font-bold text-white mb-1"><i class="fa-solid fa-flask mr-1"></i> Formulación</h4>
+             <p><b>CDP:</b> Consumo Diario Promedio. Extraído automáticamente del historial de salidas de los últimos 30 días, a menos que se fuerce un valor en el Excel (Col J).</p>
+             <p><b>ROP (Punto de Pedido):</b> <span class="font-mono text-[10px] bg-slate-700 px-1 rounded">(CDP * Tiempo_Entrega) + (CDP * Factor_Seguridad_VED)</span>. Indica el nivel de stock en el que debes generar una nueva orden de compra.</p>
+           </div>
+           <div class="flex-1 border-l border-slate-600 pl-6">
+             <h4 class="font-bold text-white mb-1"><i class="fa-solid fa-layer-group mr-1"></i> Matriz VED (Criticidad)</h4>
+             <p><span class="text-red-400 font-bold">V (Vital):</span> Material salvavidas. Su Factor de Seguridad es altísimo (7 días extra de inventario).</p>
+             <p><span class="text-blue-400 font-bold">E (Esencial):</span> Impacta la operación regular. Factor de Seguridad medio (3 días extra).</p>
+             <p><span class="text-emerald-400 font-bold">D (Deseable):</span> No crítico. Factor de Seguridad de 0 días (Ahorra espacio en almacén).</p>
+           </div>
+        </div>
+
+        <div class="flex-1 grid grid-cols-1 lg:grid-cols-4 gap-6 min-h-0">
+          
+          <!-- TABLA RPT1 PRO: MODELACIÓN DE PEDIDOS -->
+          <div :class="radarFefoAbierto ? 'lg:col-span-3' : 'lg:col-span-4'" class="bg-white border border-slate-300 rounded-xl shadow-sm flex flex-col min-h-0 transition-all duration-300">
+            <div class="p-2.5 bg-slate-100 font-bold text-slate-700 text-sm border-b border-slate-300 flex justify-between items-center">
+               <span><i class="fa-solid fa-table-list mr-1"></i> Proyecciones Dinámicas</span>
+               <span class="text-[10px] bg-white px-2 py-0.5 border rounded-md">Ordenado por estado crítico</span>
+            </div>
+            <div class="overflow-x-auto flex-1 custom-scrollbar">
+              <table class="w-full text-left table-pro border-collapse">
+                <thead class="sticky top-0 z-10 shadow-sm">
+                  <tr>
+                    <th class="w-1/3">Descripción del Material</th>
+                    <th class="text-center" title="Criticidad VED">VED</th>
+                    <th class="text-center" title="Lead Time (Días de Proveedor)">L. Time</th>
+                    <th class="text-center" title="Consumo Diario Promedio">CDP</th>
+                    <th class="text-center" title="Stock Físico Actual">Stock Act.</th>
+                    <th class="text-center bg-amber-50" title="Punto de Pedido (Re-Order Point)">ROP</th>
+                    <th class="text-center bg-blue-50 text-cania-blue" title="Cantidad Sugerida a Comprar">Sug (Q)</th>
+                    <th class="text-center">Diagnóstico</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-200">
+                  <tr v-for="item in maestroPlanificacion" :key="item.nombre">
+                    <td class="font-semibold">{{ item.nombre }}</td>
+                    <td class="text-center">
+                      <span class="px-1.5 py-0.5 rounded text-[9px] font-black text-white uppercase shadow-sm"
+                            :class="{'bg-red-500': item.criticidad === 'V', 'bg-blue-500': item.criticidad === 'E', 'bg-emerald-500': item.criticidad === 'D'}">
+                        {{ item.criticidad }}
+                      </span>
+                    </td>
+                    <td class="text-center font-mono">{{ item.leadTime }}d</td>
+                    <td class="text-center font-mono text-slate-500">{{ item.cdp.toFixed(2) }}</td>
+                    <td class="text-center font-bold text-slate-800 text-sm">{{ item.stockActual }}</td>
+                    <td class="text-center font-mono font-bold bg-amber-50/30 text-amber-700">{{ Math.ceil(item.rop) }}</td>
+                    <td class="text-center font-black text-sm text-blue-700 bg-blue-50/50">{{ item.sugeridoQ > 0 ? '+' + item.sugeridoQ : '-' }}</td>
+                    <td class="text-center">
+                      <span class="px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-wider"
+                            :class="{'bg-red-100 text-red-700': item.estadoStock === 'CRÍTICO' || item.estadoStock === 'AGOTADO', 'bg-amber-100 text-amber-700': item.estadoStock === 'COMPRAR (ROP)', 'bg-emerald-100 text-emerald-700': item.estadoStock === 'ÓPTIMO', 'bg-blue-100 text-blue-700': item.estadoStock === 'SOBRESTOCK'}">
+                        {{ item.estadoStock }}
+                      </span>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- RADAR FEFO DE VENCIMIENTOS COLECTIVOS (PRÓXIMOS 90 DÍAS) -->
+          <div v-show="radarFefoAbierto" class="bg-white border border-orange-200 rounded-xl shadow-sm flex flex-col min-h-0 transition-all duration-300">
+            <div class="p-2.5 bg-orange-100 text-orange-800 font-bold text-sm border-b border-orange-200 flex justify-between items-center">
+              <span><i class="fa-solid fa-crosshairs mr-1"></i> Radar FEFO</span>
+              <span class="text-[9px] bg-orange-500 text-white px-1.5 py-0.5 rounded shadow-sm font-black">&lt; 90 Días</span>
+            </div>
+            <div class="p-3 overflow-y-auto flex-1 custom-scrollbar space-y-2">
+              <div v-for="lote in radarFefoVencimientos" :key="lote.lote + lote.nombre" class="p-2 rounded border flex flex-col gap-1 transition-all"
+                   :class="{'bg-red-50 border-red-200': lote.diasRestantes <= 30, 'bg-amber-50 border-amber-200': lote.diasRestantes > 30}">
+                <div class="flex justify-between items-start">
+                  <h4 class="font-bold text-[10px] text-slate-800 line-clamp-1 flex-1 pr-1">{{ lote.nombre }}</h4>
+                  <span class="text-[8px] font-black px-1.5 py-0.5 rounded uppercase text-white shadow-sm"
+                        :class="{'bg-red-600 animate-pulse': lote.diasRestantes <= 30, 'bg-amber-600': lote.diasRestantes > 30}">
+                    {{ lote.diasRestantes <= 0 ? 'Expirado' : lote.diasRestantes + 'd' }}
+                  </span>
+                </div>
+                <div class="flex justify-between items-center text-[9px] font-semibold text-slate-500">
+                  <span>Lt: <b class="text-slate-800">{{ lote.lote }}</b></span>
+                  <span>Ven: <b>{{ lote.vencimiento }}</b></span>
+                </div>
+              </div>
+              <div v-if="radarFefoVencimientos.length === 0" class="text-center p-8 text-slate-400 text-xs font-medium">Inventario sano. No hay riesgos a 90 días.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div v-show="vistaActiva === 'INGRESO'" class="p-6 h-full flex flex-col">
+        <header class="mb-4 border-b border-slate-200 pb-4 flex items-center">
+          <button @click="sidebarAbierto = !sidebarAbierto" class="mr-4 text-slate-400 hover:text-cania-green transition-colors" title="Alternar Menú"><i class="fa-solid fa-bars text-2xl"></i></button>
+          <h2 class="text-2xl font-black text-cania-green flex items-center"><i class="fa-solid fa-truck-ramp-box mr-3"></i> Rellenar Inventario</h2>
+        </header>
+        <div class="flex gap-6 flex-1 min-h-0">
+          <div class="w-1/3 flex flex-col">
+            <textarea v-model="textoPegadoInventario" @input="analizarPegado" placeholder="Pega aquí las filas directo desde Excel..." class="w-full flex-1 p-3 border rounded-lg text-xs font-mono resize-none custom-scrollbar outline-none shadow-inner"></textarea>
+          </div>
+          <div class="w-2/3 bg-white border rounded-xl flex flex-col min-h-0 shadow-sm">
+            <div class="p-3 border-b flex justify-between items-center bg-slate-50">
+              <span class="font-bold text-slate-700 text-xs">Vista Previa de Ingreso ({{ datosIngresoPreview.length }} filas)</span>
+              <button @click="confirmarIngresoInventario" :disabled="datosIngresoPreview.length === 0 || procesandoIngreso" class="bg-cania-green text-white text-xs font-bold py-1.5 px-3 rounded shadow-sm disabled:opacity-50">
+                 <i v-if="procesandoIngreso" class="fa-solid fa-spinner fa-spin mr-1"></i> Ingresar Entradas
+              </button>
+            </div>
+            <div class="flex-1 overflow-y-auto custom-scrollbar text-xs">
+              <table class="w-full text-left">
+                 <thead class="bg-slate-50 sticky top-0 shadow-sm border-b">
+                     <tr><th class="p-2 font-bold">Material</th><th class="p-2 font-bold text-center">Lote</th><th class="p-2 font-bold text-center">Cant</th></tr>
+                 </thead>
+                 <tbody class="divide-y divide-slate-100">
+                    <tr v-for="(f, idx) in datosIngresoPreview" :key="idx" class="hover:bg-slate-50">
+                       <td class="p-2 font-medium">{{ f.nombre }}</td>
+                       <td class="p-2 text-center font-bold text-cania-blue">{{ f.lote }}</td>
+                       <td class="p-2 text-center font-black text-cania-green">+{{ f.cantidad }}</td>
+                    </tr>
+                    <tr v-if="datosIngresoPreview.length === 0">
+                       <td colspan="3" class="p-8 text-center text-slate-400 font-medium">A la espera de datos pegados...</td>
+                    </tr>
+                 </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div v-show="vistaActiva === 'DASHBOARD'" class="p-6 h-full flex flex-col">
+        <header class="mb-4 border-b border-slate-200 pb-2 flex items-start">
+          <button @click="sidebarAbierto = !sidebarAbierto" class="mr-4 mt-1 text-slate-400 hover:text-cania-blue transition-colors" title="Alternar Menú"><i class="fa-solid fa-bars text-2xl"></i></button>
+          <div>
+            <h2 class="text-2xl font-black text-cania-blue">Panel Analítico de Afluencia Diario</h2>
+            <p class="text-sm text-slate-500 font-medium">Control estadístico calibrado estrictamente según la <b>Fecha de Entrega</b>.</p>
+          </div>
+        </header>
+
+        <div class="flex-1 overflow-y-auto custom-scrollbar pr-2 pb-6">
+          <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+            <div class="bg-white p-3 rounded-xl shadow-sm border border-slate-200">
+              <label class="block text-xs font-bold text-slate-500 mb-1 uppercase">Mes de Análisis</label>
+              <input type="month" v-model="filtroDashMes" class="w-full text-sm font-black text-cania-blue outline-none bg-transparent">
+            </div>
+            <div class="bg-white p-3 rounded-xl shadow-sm border border-slate-200">
+               <label class="block text-xs font-bold text-slate-500 mb-1 uppercase">Modalidad</label>
+               <div class="flex gap-3 text-xs font-bold text-slate-700 mt-1">
+                  <label class="cursor-pointer"><input type="checkbox" v-model="filtroDashModalidad" value="NO"> Presencial</label>
+                  <label class="cursor-pointer"><input type="checkbox" v-model="filtroDashModalidad" value="SI"> A dist.</label>
+               </div>
+            </div>
+            <div class="bg-white p-3 rounded-xl shadow-sm border border-slate-200 col-span-2">
+              <label class="block text-xs font-bold text-slate-500 mb-1 uppercase">Tipos de Paciente</label>
+              <div class="flex gap-3 text-xs font-bold text-slate-700 mt-1">
+                <label class="cursor-pointer"><input type="checkbox" v-model="filtroDashTipos" value="Ambulatorio"> Ambulatorio</label>
+                <label class="cursor-pointer"><input type="checkbox" v-model="filtroDashTipos" value="Crónico"> Crónico</label>
+                <label class="cursor-pointer"><input type="checkbox" v-model="filtroDashTipos" value="Embarazada"> Emb.</label>
+                <label class="cursor-pointer"><input type="checkbox" v-model="filtroDashTipos" value="Madre Lactante"> Madre L.</label>
+              </div>
+            </div>
+
+            <!-- FILTROS AVANZADOS -->
+            <div class="bg-white p-3 rounded-xl shadow-sm border border-slate-200 col-span-1 md:col-span-4 flex flex-col md:flex-row gap-6 relative z-30">
+              <div class="flex-1 relative">
+                 <label class="block text-xs font-bold text-slate-500 mb-1 uppercase tracking-wide">Pacientes Específicos</label>
+                 <div class="min-h-[32px] border-b border-slate-300 pb-1 flex flex-wrap gap-1 items-center cursor-text">
+                   <span v-for="(pac, idx) in filtroDashPacientes" :key="idx" class="bg-cania-blue text-white text-xs px-2 py-0.5 rounded flex items-center gap-1 shadow-sm">
+                     {{ pac }} <i class="fa-solid fa-times cursor-pointer hover:text-red-300" @click.stop="filtroDashPacientes.splice(idx, 1)"></i>
+                   </span>
+                   <input type="text" v-model="busquedaDashPaciente" placeholder="Buscar o seleccionar..." class="flex-1 text-sm outline-none min-w-[120px] py-1" @focus="dropdownPacientesAbierto = true">
+                 </div>
+                 <div v-if="dropdownPacientesAbierto" class="fixed inset-0 z-40" @click="dropdownPacientesAbierto = false"></div>
+                 <div v-if="dropdownPacientesAbierto" class="absolute top-full left-0 w-full bg-white border border-slate-200 shadow-xl rounded-lg max-h-48 overflow-y-auto z-50 mt-1">
+                    <div v-for="p in pacientesDisponibles" :key="p" @click="toggleFiltroPaciente(p)" class="p-2 text-sm hover:bg-blue-50 cursor-pointer flex justify-between items-center border-b border-slate-50 last:border-0">
+                      <span class="text-slate-700 font-semibold">{{ p }}</span>
+                      <i v-if="filtroDashPacientes.includes(p)" class="fa-solid fa-check text-cania-orange"></i>
+                    </div>
+                 </div>
+              </div>
+              <div class="flex-1 relative">
+                 <label class="block text-xs font-bold text-slate-500 mb-1 uppercase tracking-wide">Medicamentos Específicos</label>
+                 <div class="min-h-[32px] border-b border-slate-300 pb-1 flex flex-wrap gap-1 items-center cursor-text">
+                   <span v-for="(med, idx) in filtroDashMedicamentos" :key="idx" class="bg-cania-orange text-white text-xs px-2 py-0.5 rounded flex items-center gap-1 shadow-sm">
+                     {{ med }} <i class="fa-solid fa-times cursor-pointer hover:text-red-200" @click.stop="filtroDashMedicamentos.splice(idx, 1)"></i>
+                   </span>
+                   <input type="text" v-model="busquedaDashMedicamento" placeholder="Buscar o seleccionar..." class="flex-1 text-sm outline-none min-w-[120px] py-1" @focus="dropdownMedicamentosAbierto = true">
+                 </div>
+                 <div v-if="dropdownMedicamentosAbierto" class="fixed inset-0 z-40" @click="dropdownMedicamentosAbierto = false"></div>
+                 <div v-if="dropdownMedicamentosAbierto" class="absolute top-full left-0 w-full bg-white border border-slate-200 shadow-xl rounded-lg max-h-48 overflow-y-auto z-50 mt-1">
+                    <div v-for="m in medicamentosDisponibles" :key="m" @click="toggleFiltroMedicamento(m)" class="p-2 text-sm hover:bg-blue-50 cursor-pointer flex justify-between items-center border-b border-slate-50 last:border-0">
+                      <span class="text-slate-700 font-semibold">{{ m }}</span>
+                      <i v-if="filtroDashMedicamentos.includes(m)" class="fa-solid fa-check text-cania-orange"></i>
+                    </div>
+                 </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- TARJETAS DE VISITAS ÚNICAS -->
+          <div class="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
+            <div class="bg-cania-blue text-white p-4 rounded-xl shadow-md">
+               <p class="text-xs text-blue-200 font-bold uppercase">Total Fármacos</p>
+               <p class="text-3xl font-black mt-1">{{ datosDashboard.stats.total }}</p>
+            </div>
+            <div class="bg-white border p-4 rounded-xl shadow-sm">
+               <p class="text-xs text-slate-500 font-bold uppercase">Total Pacientes Únicos</p>
+               <p class="text-3xl font-black text-slate-800 mt-1">{{ totalPacientesUnicosMes }}</p>
+            </div>
+            <div class="bg-white border p-4 rounded-xl shadow-sm">
+               <p class="text-xs text-slate-500 font-bold uppercase">Promedio Diario</p>
+               <p class="text-3xl font-black text-cania-orange mt-1">{{ promedioPacientesPorDia }}</p>
+            </div>
+            <div class="bg-white border p-4 rounded-xl shadow-sm">
+               <p class="text-xs text-slate-500 font-bold uppercase">Pico Máximo de Afluencia</p>
+               <p class="text-3xl font-black text-red-600 mt-1">{{ picoMaximoPacientesDia }}</p>
+            </div>
+            <div class="bg-white border p-4 rounded-xl shadow-sm">
+               <p class="text-xs text-slate-500 font-bold uppercase">Fármacos x Paciente</p>
+               <p class="text-3xl font-black text-emerald-600 mt-1">{{ promedioFarmacosPorPaciente }}</p>
+            </div>
+          </div>
+
+          <!-- CURVA DE AFLUENCIA (BARRAS) ARRIBA -->
+          <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200 h-72 flex flex-col mb-6">
+            <h3 class="font-bold text-slate-700 text-sm mb-4 text-center">Distribución de Afluencia Diaria (Visitas Únicas del Mes)</h3>
+            <div class="flex-1 relative w-full h-full min-h-[150px] flex items-center justify-center">
+              <canvas id="chartCurvaDiaria"></canvas>
+            </div>
+          </div>
+
+          <!-- TABLA CRONOLÓGICA DE VISITAS -->
+          <div class="bg-white rounded-xl shadow-sm border overflow-hidden mb-6">
+            <div class="bg-cania-blue text-white p-3 font-bold text-sm">Cronología Detallada de Pacientes por Día</div>
+            <div class="overflow-x-auto">
+              <table class="w-full text-xs text-center border-collapse">
+                <thead class="bg-slate-50 border-b text-slate-700 font-bold">
+                  <tr>
+                    <th class="p-3 text-left">Fecha de Entrega</th>
+                    <th class="p-3">Ambulatorios</th>
+                    <th class="p-3">Crónicos</th>
+                    <th class="p-3">Embarazadas</th>
+                    <th class="p-3">Madres Lactantes</th>
+                    <th class="p-3 bg-blue-50 text-cania-blue">Total Pacientes Únicos</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-200 font-medium">
+                  <tr v-for="fila in tablaAfluenciaDiaria" :key="fila.fecha" class="hover:bg-slate-50">
+                    <td class="p-3 text-left font-bold text-slate-700">{{ fila.fechaFormateada }}</td>
+                    <td class="p-3">{{ fila.Ambulatorio || '-' }}</td>
+                    <td class="p-3">{{ fila['Crónico'] || '-' }}</td>
+                    <td class="p-3">{{ fila.Embarazada || '-' }}</td>
+                    <td class="p-3">{{ fila['Madre Lactante'] || '-' }}</td>
+                    <td class="p-3 font-black text-cania-blue bg-blue-50">{{ fila.Total }}</td>
+                  </tr>
+                  <tr v-if="tablaAfluenciaDiaria.length === 0">
+                    <td colspan="6" class="p-8 text-center text-slate-400 font-medium">No hay registros con los filtros seleccionados.</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- GRÁFICO PARETO 80/20 (ABAJO) -->
+          <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200 h-80 flex flex-col">
+            <div class="flex justify-between items-center mb-2">
+               <h3 class="font-bold text-slate-700 text-sm">Ley de Pareto (80/20): Concentración del Consumo de Fármacos</h3>
+               <span class="text-[10px] bg-slate-100 border text-slate-600 px-2 py-0.5 rounded font-bold uppercase">Unidades Entregadas vs. % Acumulado</span>
+            </div>
+            <div class="flex-1 relative w-full h-full min-h-[200px] flex items-center justify-center">
+              <canvas id="chartParetoConsumo"></canvas>
+            </div>
+          </div>
+
+          <!-- TABLA RESUMEN DETALLADO POR MEDICAMENTO (RESTAURADA) -->
+          <div class="bg-white rounded-xl shadow-sm border overflow-hidden mt-6">
+            <div class="bg-cania-blue text-white p-3 font-bold text-sm">Resumen Detallado por Medicamento y Tipo de Paciente</div>
+            <div class="overflow-x-auto">
+              <table class="w-full text-xs text-center border-collapse">
+                <thead class="bg-slate-50 border-b text-slate-700 font-bold">
+                  <tr>
+                    <th class="p-3 text-left border-r w-1/3">Descripción del Material</th>
+                    <th class="p-3">Ambulatorios</th>
+                    <th class="p-3">Crónicos</th>
+                    <th class="p-3">Embarazadas</th>
+                    <th class="p-3">Madres Lactantes</th>
+                    <th class="p-3 bg-blue-50 text-cania-blue">Total Unidades</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-200 font-medium">
+                  <tr v-for="fila in tablaDashboard" :key="fila[0]" class="hover:bg-slate-50">
+                    <td class="p-3 text-left font-bold text-slate-700 border-r">{{ fila[0] }}</td>
+                    <td class="p-3">{{ fila[1].Ambulatorio || '-' }}</td>
+                    <td class="p-3">{{ fila[1]['Crónico'] || '-' }}</td>
+                    <td class="p-3">{{ fila[1].Embarazada || '-' }}</td>
+                    <td class="p-3">{{ fila[1]['Madre Lactante'] || '-' }}</td>
+                    <td class="p-3 font-black text-cania-blue bg-blue-50">{{ fila[1].Total }}</td>
+                  </tr>
+                  <tr v-if="tablaDashboard.length === 0">
+                    <td colspan="6" class="p-8 text-center text-slate-400 font-medium">No hay registros con los filtros seleccionados.</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- NUEVA VISTA: PACIENTES CRÓNICOS (FINANZAS) -->
+      <div v-show="vistaActiva === 'CRONICOS'" class="p-6 h-full flex flex-col">
+        <header class="mb-4 border-b border-slate-200 pb-2 flex items-start">
+          <button @click="sidebarAbierto = !sidebarAbierto" class="mr-4 mt-1 text-slate-400 hover:text-emerald-600 transition-colors" title="Alternar Menú"><i class="fa-solid fa-bars text-2xl"></i></button>
+          <div class="flex-1">
+            <h2 class="text-2xl font-black text-emerald-700"><i class="fa-solid fa-file-invoice-dollar mr-2"></i>Finanzas & Historial: Pacientes Crónicos</h2>
+            <p class="text-sm text-slate-500 font-medium">Análisis de Costos (VES) utilizando Precios Unitarios del Inventario.</p>
+          </div>
+        </header>
+
+        <div class="flex-1 overflow-y-auto custom-scrollbar pr-2 pb-6">
+          
+          <!-- FILTROS CRÓNICOS -->
+          <div class="bg-white p-4 rounded-xl border border-slate-200 mb-6 shadow-sm flex flex-col md:flex-row gap-4 relative z-30">
+            <div class="flex-1">
+               <label class="block text-xs font-bold text-slate-500 mb-1 uppercase tracking-wide">Buscar Triaje o Nombre</label>
+               <div class="relative">
+                  <i class="fa-solid fa-search absolute left-3 top-2.5 text-slate-400"></i>
+                  <input type="text" v-model="busquedaCronicoPaciente" placeholder="Ej. 105826 o PÉREZ..." class="w-full pl-9 pr-3 py-1.5 border rounded-lg text-sm outline-none focus:border-emerald-500">
+               </div>
+            </div>
+            <div class="flex-1">
+               <label class="block text-xs font-bold text-slate-500 mb-1 uppercase tracking-wide">Filtrar por Diagnóstico (Nx o As)</label>
+               <div class="relative">
+                  <i class="fa-solid fa-stethoscope absolute left-3 top-2.5 text-slate-400"></i>
+                  <input type="text" v-model="busquedaCronicoDiag" placeholder="Buscar patología o diagnóstico..." class="w-full pl-9 pr-3 py-1.5 border rounded-lg text-sm outline-none focus:border-emerald-500">
+               </div>
+            </div>
+            <div class="w-full md:w-48">
+               <label class="block text-xs font-bold text-slate-500 mb-1 uppercase tracking-wide">Mes de Filtro</label>
+               <input type="month" v-model="filtroCronicoMes" class="w-full text-sm font-black text-emerald-700 bg-emerald-50 border border-emerald-200 py-1.5 px-3 rounded-lg outline-none">
+            </div>
+          </div>
+
+          <!-- TARJETAS FINANCIERAS -->
+          <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+             <div class="bg-emerald-700 text-white p-4 rounded-xl shadow-md col-span-1 md:col-span-2 flex justify-between items-center">
+                <div>
+                   <p class="text-xs text-emerald-200 font-bold uppercase tracking-wider">Costo Total del Período Seleccionado</p>
+                   <p class="text-3xl font-black mt-1">{{ formatoMoneda(metricasCronicos.gastoTotal) }}</p>
+                </div>
+                <i class="fa-solid fa-coins text-5xl opacity-20"></i>
+             </div>
+             <div class="bg-white border border-slate-200 p-4 rounded-xl shadow-sm text-center">
+               <p class="text-xs text-slate-500 font-bold uppercase tracking-wider">Total Registros</p>
+               <p class="text-3xl font-black text-slate-800 mt-1">{{ cronicosFiltrados.length }}</p>
+             </div>
+             <div class="bg-white border border-slate-200 p-4 rounded-xl shadow-sm text-center">
+               <p class="text-xs text-slate-500 font-bold uppercase tracking-wider">Top Gastos</p>
+               <p class="text-sm font-bold text-emerald-600 mt-1 truncate" :title="metricasCronicos.topPaciente.nombre">
+                  <i class="fa-solid fa-crown text-amber-400 mr-1"></i> {{ metricasCronicos.topPaciente.nombre || 'N/A' }}
+               </p>
+               <p class="text-xs font-black text-slate-700 mt-0.5">{{ formatoMoneda(metricasCronicos.topPaciente.gasto) }}</p>
+             </div>
+          </div>
+
+          <!-- TABLA CRÓNICOS -->
+          <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+            <div class="bg-emerald-50 border-b border-emerald-100 p-3 font-bold text-sm text-emerald-800 flex justify-between items-center">
+               <span>Registro Consolidado de Pacientes Crónicos</span>
+            </div>
+            <div class="overflow-x-auto">
+              <table class="w-full text-xs text-left">
+                <thead class="bg-slate-50 border-b text-slate-600 uppercase">
+                  <tr>
+                    <th class="p-3 font-bold w-20">Triaje</th>
+                    <th class="p-3 font-bold">Paciente</th>
+                    <th class="p-3 font-bold w-48">Diagnóstico As / Nx</th>
+                    <th class="p-3 font-bold text-center">Fecha Retiro</th>
+                    <th class="p-3 font-bold">Medicamento Retirado</th>
+                    <th class="p-3 font-bold text-center">Cant.</th>
+                    <th class="p-3 font-bold text-right text-emerald-700">Costo Total (VES)</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100">
+                  <tr v-for="(c, idx) in cronicosFiltrados" :key="idx" class="hover:bg-emerald-50/30">
+                    <td class="p-3 font-bold text-slate-700">{{ c.triaje }}</td>
+                    <td class="p-3 font-bold text-cania-blue">{{ c.nombreCompleto }}</td>
+                    <td class="p-3 text-[10px] text-slate-500 leading-tight">
+                       <span class="block line-clamp-1" :title="c.diagAs"><b>As:</b> {{ c.diagAs || 'N/A' }}</span>
+                       <span class="block line-clamp-1" :title="c.diagNx"><b>Nx:</b> {{ c.diagNx || 'N/A' }}</span>
+                    </td>
+                    <td class="p-3 text-center text-slate-600">{{ c.fechaStr }}</td>
+                    <td class="p-3 font-semibold">{{ c.producto }}</td>
+                    <td class="p-3 text-center font-black text-slate-700">{{ c.cantidad }}</td>
+                    <td class="p-3 text-right font-black text-emerald-600">{{ formatoMoneda(c.gastoTotal) }}</td>
+                  </tr>
+                  <tr v-if="cronicosFiltrados.length === 0">
+                    <td colspan="7" class="p-8 text-center text-slate-400 font-medium">No se encontraron registros de pacientes crónicos con esos filtros.</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- MODAL NUEVO PACIENTE SEPARADO (CON PROTECCIÓN TRIAJE) -->
+      <div v-if="mostrarModalPaciente" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[200] flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden border-2 border-cania-blue">
+          <div class="bg-cania-blue p-4 flex justify-between items-center text-white">
+            <h3 class="font-bold text-lg"><i class="fa-solid fa-user-plus mr-2"></i>Registrar Paciente</h3>
+            <button @click="mostrarModalPaciente = false" class="hover:text-red-400"><i class="fa-solid fa-times text-xl"></i></button>
+          </div>
+          <div class="p-6 space-y-4 text-xs">
+            <div>
+              <label class="block font-bold text-slate-700 mb-1">Número de Triaje (Caso Clínico)</label>
+              <input id="np-triaje" v-model="nuevoPaciente.id" @keydown.down.prevent="moverFoco('np-apellidos')" type="text" placeholder="Ej. 105826" class="w-full p-2 border rounded-lg outline-none focus:border-cania-orange">
+            </div>
+            <div class="grid grid-cols-2 gap-4">
+              <div>
+                <label class="block font-bold text-slate-700 mb-1">Apellidos</label>
+                <input id="np-apellidos" v-model="nuevoPaciente.apellidos" @keydown.up.prevent="moverFoco('np-triaje')" @keydown.down.prevent="moverFoco('np-nombres')" type="text" placeholder="Ej. PÉREZ" class="w-full p-2 border rounded-lg outline-none focus:border-cania-orange">
+              </div>
+              <div>
+                <label class="block font-bold text-slate-700 mb-1">Nombres</label>
+                <input id="np-nombres" v-model="nuevoPaciente.nombres" @keydown.up.prevent="moverFoco('np-apellidos')" @keydown.down.prevent="moverFoco('np-tipo')" type="text" placeholder="Ej. JUAN" class="w-full p-2 border rounded-lg outline-none focus:border-cania-orange">
+              </div>
+            </div>
+            <div>
+              <label class="block font-bold text-slate-700 mb-1">Tipo de Paciente</label>
+              <select id="np-tipo" v-model="nuevoPaciente.tipo" class="w-full p-2 border rounded-lg outline-none font-bold">
+                <option value="Ambulatorio">Ambulatorio</option>
+                <option value="Crónico">Crónico</option>
+                <option value="Embarazada">Embarazada</option>
+                <option value="Madre Lactante">Madre Lactante</option>
+              </select>
+            </div>
+            <div class="grid grid-cols-2 gap-4">
+              <div>
+                <label class="block font-bold text-slate-700 mb-1">Diag. Nutrición</label>
+                <input id="np-nx" v-model="nuevoPaciente.diagnosticoNx" type="text" class="w-full p-2 border rounded-lg outline-none focus:border-cania-orange">
+              </div>
+              <div>
+                <label class="block font-bold text-slate-700 mb-1">Diag. Asociados</label>
+                <input id="np-as" v-model="nuevoPaciente.diagnosticoAs" @keyup.enter="guardarNuevoPaciente" type="text" class="w-full p-2 border rounded-lg outline-none focus:border-cania-orange">
+              </div>
+            </div>
+            <button @click="guardarNuevoPaciente" :disabled="guardandoPaciente" class="w-full font-bold py-3 rounded-xl shadow-md transition-colors flex items-center justify-center" :class="guardandoPaciente ? 'bg-slate-400 text-white cursor-not-allowed' : 'bg-cania-orange hover:bg-cania-orangeHover text-white'">
+               <i v-if="guardandoPaciente" class="fa-solid fa-spinner fa-spin mr-2"></i>
+               <span>{{ guardandoPaciente ? 'Guardando Paciente...' : 'Crear Paciente' }}</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- MODAL SELECCIONAR LOTE (ORDENADO BAJO FEFO PURO) -->
+      <div v-if="mostrarModalLote" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[200] flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden border-2 border-cania-blue">
+          <div class="bg-cania-blue p-4 flex justify-between items-center text-white">
+            <h3 class="font-bold text-sm"><i class="fa-solid fa-box-open mr-2"></i>Sugerencia de Salida (FEFO): {{ productoActivoLote?.nombre }}</h3>
+            <button @click="mostrarModalLote = false" class="hover:text-red-400"><i class="fa-solid fa-times text-xl"></i></button>
+          </div>
+          <div class="p-4 text-xs">
+             <p class="text-slate-500 mb-3 font-bold">⚠️ Los lotes aparecen ordenados por fecha de vencimiento. Extrae preferiblemente el primero de la lista.</p>
+             <div class="max-h-60 overflow-y-auto custom-scrollbar border rounded-lg">
+                <table class="w-full text-left">
+                   <thead class="bg-slate-100 text-slate-600 font-bold">
+                      <tr><th class="p-2 text-center">Lote</th><th class="p-2 text-center">Vence</th><th class="p-2 text-center">Estado</th><th class="p-2 text-center">Disp.</th><th class="p-2 text-center w-24">Extraer</th></tr>
+                   </thead>
+                   <tbody>
+                      <tr v-for="(lt, idx) in lotesTemporales" :key="idx" class="hover:bg-slate-50 border-b">
+                         <td class="p-2 text-center font-bold text-cania-blue">{{ lt.lote }}</td>
+                         <td class="p-2 text-center font-semibold text-slate-600">{{ lt.vencimiento }}</td>
+                         <td class="p-2 text-center">
+                            <span class="px-2 py-0.5 rounded text-[9px] font-black uppercase" :class="{'bg-emerald-100 text-emerald-700': lt.estado==='VIGENTE', 'bg-amber-100 text-amber-700': lt.estado==='PRÓXIMOS A VENCER', 'bg-red-100 text-red-700': lt.estado==='EXPIRADO'}">{{ lt.estado }}</span>
+                         </td>
+                         <td class="p-2 text-center font-black text-slate-700">{{ lt.cantidadDisponible }}</td>
+                         <td class="p-2 text-center">
+                            <input :id="'lote-' + idx" type="number" v-model.number="lt.cantidadAExtraer" :max="lt.cantidadDisponible" min="0" @keyup.enter="confirmarLotes" class="w-16 p-1 border rounded text-center font-bold text-cania-orange bg-orange-50 outline-none">
+                         </td>
+                      </tr>
+                   </tbody>
+                </table>
+             </div>
+             <button @click="confirmarLotes" class="w-full mt-4 bg-cania-orange text-white font-bold py-3 rounded-xl shadow-md">Añadir Seleccionados al Carrito</button>
+          </div>
+        </div>
+      </div>
+
+    </main>
+  </div>
+
+  <script>
+    const { createApp } = Vue;
+
+    // ⚡ VARIABLES GLOBALES PURAS PARA GRÁFICOS (Inmunes a Vue Proxy) ⚡
+    let chartInstanceGlobal = null;
+    let chartParetoGlobal = null;
+    let chartTimeoutGlobal = null;
+
+    // --- SANITIZADOR DE MONEDA (VENEZUELA: Convierte 1.500,50 a 1500.50 en matemática pura) ---
+    const sanitizarMoneda = (val) => {
+        if (val == null || val === '') return 0;
+        if (typeof val === 'number') return val;
+        let str = String(val).trim();
+        // Quita puntos (miles) y cambia coma por punto (decimales)
+        str = str.replace(/\./g, '').replace(/,/g, '.');
+        let num = parseFloat(str);
+        return isNaN(num) ? 0 : num;
+    };
+
+    createApp({
+      data() {
+        return {
+          vistaActiva: 'INVENTARIO',
+          sidebarAbierto: false, 
+          cargando: true, procesando: false, guardandoPaciente: false, procesandoIngreso: false,
+          
+          // Data cruda de GS
+          pacientes: [], inventario: [], registros: [], cronicos: [],
+          
+          // Controles de UI
+          radarFefoAbierto: true, leyendaVedAbierta: false,
+          busquedaPaciente: '', busquedaInventario: '',
+          pacienteSeleccionado: null, carrito: [],
+          modalidadEntrega: 'NO', fechaEntregaGlobal: new Date().toISOString().split('T')[0],
+          mostrarModalPaciente: false,
+          nuevoPaciente: { id: '', nombres: '', apellidos: '', tipo: 'Ambulatorio', diagnosticoNx: '', diagnosticoAs: '' },
+          mostrarModalLote: false, productoActivoLote: null, lotesTemporales: [],
+          
+          // INVENTARIO BILINGÜE
+          filtroVistaEstado: '',
+          filtroInvMedicamentos: [], busquedaInvMedicamento: '', dropdownInvMedicamentosAbierto: false,
+          textoPegadoInventario: '', datosIngresoPreview: [],
+          
+          // DASHBOARD
+          filtroDashMes: '', 
+          filtroDashTipos: ['Ambulatorio', 'Crónico', 'Embarazada', 'Madre Lactante'],
+          filtroDashModalidad: ['NO', 'SI'],
+          filtroDashPacientes: [], filtroDashMedicamentos: [],
+          busquedaDashPaciente: '', busquedaDashMedicamento: '',
+          dropdownPacientesAbierto: false, dropdownMedicamentosAbierto: false,
+
+          // CRÓNICOS FINANZAS
+          busquedaCronicoPaciente: '', busquedaCronicoDiag: '', filtroCronicoMes: ''
+        }
+      },
+      computed: {
+        pacientesFiltrados() {
+          const q = this.busquedaPaciente.toLowerCase();
+          if(!q) return [];
+          return this.pacientes.filter(p => p[0].toString().toLowerCase().includes(q) || (p[1] + " " + p[2]).toLowerCase().includes(q)).slice(0, 5);
+        },
+        
+        // =====================================================================
+        // INVENTARIO BILINGÜE Y DEPURADOR DE CEROS
+        // =====================================================================
+        inventarioDetalladoLotes() {
+           let items = this.inventario.map(item => {
+              let est = item[6] ? String(item[6]).trim().toUpperCase() : 'VIGENTE';
+              if (est === 'PROXIMO A VENCER' || est === 'PRÓXIMO A VENCER') est = 'PRÓXIMOS A VENCER';
+              
+              // LÓGICA BILINGÜE: Columna L (11) es Desc Real. Si está vacía usa C (2)
+              let nombreReal = item[11] ? String(item[11]).trim() : '';
+              let nombreClinico = nombreReal !== '' ? nombreReal : String(item[2]).trim();
+
+              return {
+                codigo: item[0], lote: item[1] || 'S/L', nombre: nombreClinico, 
+                cantidad: Number(item[3]) || 0, unidad: item[4],
+                vencimiento: item[5] ? this.formatearFechaLocal(item[5]) : 'N/A',
+                estado: est,
+                // Mantenemos el nombre original de SAP oculto para búsquedas y agrupaciones internas si hace falta
+                nombreSAP: String(item[2]).trim() 
+              };
+           });
+
+           // Agrupar por nombre clínico para limpiar lotes en cero
+           let agrupados = {};
+           items.forEach(i => {
+              if(!agrupados[i.nombre]) agrupados[i.nombre] = [];
+              agrupados[i.nombre].push(i);
+           });
+
+           let resultado = [];
+           Object.values(agrupados).forEach(lotes => {
+              let lotesConStock = lotes.filter(l => l.cantidad > 0);
+              if (lotesConStock.length > 0) resultado.push(...lotesConStock);
+              else if(lotes.length > 0) resultado.push(lotes[0]); // Si todos cero, deja 1 de muestra
+           });
+           return resultado;
+        },
+
+        opcionesMedicamentosInv() {
+          const set = new Set();
+          this.inventarioDetalladoLotes.forEach(i => set.add(i.nombre));
+          return Array.from(set).filter(m => m.toLowerCase().includes(this.busquedaInvMedicamento.toLowerCase())).sort();
+        },
+
+        inventarioFiltradoFarmacia() {
+           return this.inventarioDetalladoLotes.filter(item => {
+              let mEst = !this.filtroVistaEstado || item.estado === this.filtroVistaEstado;
+              let mText = true;
+              if (this.filtroInvMedicamentos.length > 0) {
+                  mText = this.filtroInvMedicamentos.includes(item.nombre);
+                  if(mText && this.busquedaInvMedicamento) mText = String(item.lote).toLowerCase().includes(this.busquedaInvMedicamento.toLowerCase());
+              } else if (this.busquedaInvMedicamento) {
+                  mText = item.nombre.toLowerCase().includes(this.busquedaInvMedicamento.toLowerCase()) || 
+                          String(item.lote).toLowerCase().includes(this.busquedaInvMedicamento.toLowerCase());
+              }
+              return mText && mEst;
+           });
+        },
+
+        // Para el Punto de Venta (Usa el nombre SAP internamente para no romper fórmulas viejas)
+        inventarioAgrupado() {
+            let grupos = {};
+            this.inventario.forEach(item => {
+                let descSAP = item[2] ? String(item[2]).trim() : '';
+                if (!descSAP) return;
+                let cant = Number(item[3]) || 0;
+                if(!grupos[descSAP]) grupos[descSAP] = { nombre: descSAP, cantidadTotal: 0, items: [] };
+                grupos[descSAP].cantidadTotal += cant;
+                grupos[descSAP].items.push(item);
+            });
+            return Object.values(grupos).sort((a,b) => a.nombre.localeCompare(b.nombre));
+        },
+        inventarioAgrupadoFiltrado() {
+          const q = this.busquedaInventario.toLowerCase();
+          if(!q) return this.inventarioAgrupado.slice(0, 30);
+          return this.inventarioAgrupado.filter(g => g.nombre.toLowerCase().includes(q)).slice(0, 30);
+        },
+
+        // =====================================================================
+        // VED PLANIFICACIÓN: 100% DATOS REALES (Cols H, I, J, K)
+        // =====================================================================
+        maestroPlanificacion() {
+          const mapaCdpReales = {};
+          const unMesAtras = new Date(); unMesAtras.setDate(unMesAtras.getDate() - 30);
+          this.registros.forEach(reg => {
+            if(reg[11] && new Date(reg[11]) >= unMesAtras) {
+              const med = String(reg[6]).trim();
+              mapaCdpReales[med] = (mapaCdpReales[med] || 0) + (Number(reg[7]) || 0);
+            }
+          });
+
+          return this.inventarioAgrupado.map(grupo => {
+            const maestroRow = grupo.items[0];
+            
+            // LEYENDO DATOS REALES DEL EXCEL
+            const ltRaw = maestroRow[7]; // Columna H (Lead Time)
+            const cobRaw = maestroRow[8]; // Columna I (Cobertura)
+            const cdpManual = parseFloat(maestroRow[9]); // Columna J (CDP)
+            const critRaw = maestroRow[10] ? String(maestroRow[10]).trim().toUpperCase() : 'E'; // Columna K (VED)
+
+            const leadTime = (ltRaw === "" || isNaN(parseInt(ltRaw))) ? 14 : parseInt(ltRaw);
+            const cobertura = (cobRaw === "" || isNaN(parseInt(cobRaw))) ? 30 : parseInt(cobRaw);
+            const criticidad = ['V', 'E', 'D'].includes(critRaw) ? critRaw : 'E';
+
+            // Jerarquía de Consumo
+            const cdpHistorico = (mapaCdpReales[grupo.nombre] || 0) / 30;
+            const cdpActivo = (!isNaN(cdpManual) && cdpManual > 0) ? cdpManual : cdpHistorico;
+
+            // Factor de Seguridad VED
+            let factorSeguridadDias = 3; 
+            if(criticidad === 'V') factorSeguridadDias = 7; 
+            if(criticidad === 'D') factorSeguridadDias = 0; 
+            
+            // FÓRMULA ROP
+            const rop = (cdpActivo * leadTime) + (cdpActivo * factorSeguridadDias);
+
+            const stockActual = grupo.cantidadTotal;
+            const stockMaximoDinamico = cdpActivo * cobertura;
+            let cantidadSugerida = 0;
+            let estadoStock = 'ÓPTIMO';
+
+            if(stockActual <= 0) {
+              estadoStock = 'AGOTADO';
+              cantidadSugerida = stockMaximoDinamico;
+            } else if (stockActual <= (cdpActivo * factorSeguridadDias)) {
+              estadoStock = 'CRÍTICO';
+              cantidadSugerida = stockMaximoDinamico - stockActual;
+            } else if (stockActual <= rop) {
+              estadoStock = 'COMPRAR (ROP)';
+              cantidadSugerida = stockMaximoDinamico - stockActual;
+            } else if (stockActual > (stockMaximoDinamico * 1.5)) {
+               estadoStock = 'SOBRESTOCK';
+            }
+
+            return { nombre: grupo.nombre, criticidad, cdp: cdpActivo, stockActual, rop, sugeridoQ: Math.ceil(cantidadSugerida), estadoStock, leadTime };
+          }).sort((a, b) => {
+             const orden = { 'AGOTADO': 1, 'CRÍTICO': 2, 'COMPRAR (ROP)': 3, 'SOBRESTOCK': 4, 'ÓPTIMO': 5 };
+             return orden[a.estadoStock] - orden[b.estadoStock];
+          });
+        },
+
+        countAlertasStock() {
+          let critico = 0, pedido = 0, sobrestock = 0;
+          this.maestroPlanificacion.forEach(i => {
+            if(i.estadoStock === 'AGOTADO' || i.estadoStock === 'CRÍTICO') critico++;
+            if(i.estadoStock === 'COMPRAR (ROP)') pedido++;
+            if(i.estadoStock === 'SOBRESTOCK') sobrestock++;
+          });
+          return { critico, pedido, sobrestock };
+        },
+
+        radarFefoVencimientos() {
+          const hoy = new Date(); 
+          let radar = [];
+          this.inventario.forEach(item => {
+            if(item[5]) {
+              const fVenc = new Date(item[5]);
+              const diffDays = Math.ceil((fVenc - hoy) / (1000 * 60 * 60 * 24));
+              if(diffDays <= 90 && Number(item[3]) > 0) {
+                radar.push({ nombre: item[2], lote: item[1] || 'S/L', vencimiento: this.formatearFechaLocal(item[5]), diasRestantes: diffDays });
+              }
+            }
+          });
+          return radar.sort((a,b) => a.diasRestantes - b.diasRestantes);
+        },
+
+        // =====================================================================
+        // DASHBOARD AFLUENCIA
+        // =====================================================================
+        pacientesDisponibles() {
+          const set = new Set(); this.registros.forEach(r => { if(r[3]) set.add(r[3]); });
+          return Array.from(set).filter(p => p.toLowerCase().includes(this.busquedaDashPaciente.toLowerCase())).sort();
+        },
+        medicamentosDisponibles() {
+          const set = new Set(); this.registros.forEach(r => { if(r[6]) set.add(r[6]); });
+          return Array.from(set).filter(m => m.toLowerCase().includes(this.busquedaDashMedicamento.toLowerCase())).sort();
+        },
+
+        datosDashboard() {
+          let targetMes = this.filtroDashMes; 
+          let filtrados = this.registros.filter(r => {
+            if (targetMes) {
+               let f = r[11] ? String(r[11]).trim() : (r[1] ? String(r[1]).trim() : "");
+               let mesFila = "";
+               if (f.includes('T')) mesFila = f.substring(0, 7);
+               else if (f.includes('-')) mesFila = f.substring(0, 7);
+               if (mesFila !== targetMes) return false;
+            }
+            if(!this.filtroDashTipos.includes(this.normalizarTipo(r[5]))) return false;
+            let rawMod = r[4] ? String(r[4]).toUpperCase().trim() : 'NO';
+            let mod = (rawMod === 'NO' || rawMod === 'PRESENCIAL' || rawMod === 'FALSE') ? 'NO' : 'SI';
+            if(!this.filtroDashModalidad.includes(mod)) return false;
+            if(this.filtroDashPacientes.length > 0 && (!r[3] || !this.filtroDashPacientes.includes(r[3]))) return false;
+            if(this.filtroDashMedicamentos.length > 0 && (!r[6] || !this.filtroDashMedicamentos.includes(r[6]))) return false;
+            return true;
+          });
+
+          let stats = { total: 0 };
+          filtrados.forEach(r => { stats.total += (Number(r[7]) || 0); });
+          return { filtrados, stats };
+        },
+
+        totalPacientesUnicosMes() {
+          const setUnicos = new Set(); this.datosDashboard.filtrados.forEach(r => { if(r[3]) setUnicos.add(r[3]); });
+          return setUnicos.size;
+        },
+        promedioPacientesPorDia() {
+          if(this.datosDashboard.filtrados.length === 0) return 0;
+          const diasConVisitas = new Set();
+          this.datosDashboard.filtrados.forEach(r => { 
+             let f = r[11] ? String(r[11]).trim() : (r[1] ? String(r[1]).trim() : "");
+             if(f) diasConVisitas.add(f.split('T')[0]); 
+          });
+          return diasConVisitas.size > 0 ? (this.totalPacientesUnicosMes / diasConVisitas.size).toFixed(1) : 0;
+        },
+        picoMaximoPacientesDia() {
+          const mapaDias = {};
+          this.datosDashboard.filtrados.forEach(r => {
+            let f = r[11] ? String(r[11]).trim() : (r[1] ? String(r[1]).trim() : "");
+            if(f) {
+              const dia = f.split('T')[0];
+              if(!mapaDias[dia]) mapaDias[dia] = new Set();
+              mapaDias[dia].add(r[3]);
+            }
+          });
+          let max = 0; Object.values(mapaDias).forEach(set => { if(set.size > max) max = set.size; });
+          return max;
+        },
+        promedioFarmacosPorPaciente() {
+          return this.totalPacientesUnicosMes > 0 ? (this.datosDashboard.stats.total / this.totalPacientesUnicosMes).toFixed(1) : 0;
+        },
+
+        tablaAfluenciaDiaria() {
+          let dias = {};
+          this.datosDashboard.filtrados.forEach(r => {
+            let f = r[11] ? String(r[11]).trim() : (r[1] ? String(r[1]).trim() : "");
+            if(f) {
+              const dia = f.split('T')[0]; 
+              const tipo = this.normalizarTipo(r[5]);
+              if(!dias[dia]) dias[dia] = { Ambulatorio: new Set(), 'Crónico': new Set(), Embarazada: new Set(), 'Madre Lactante': new Set(), UnicosGlobal: new Set() };
+              dias[dia][tipo].add(r[3]);
+              dias[dia].UnicosGlobal.add(r[3]);
+            }
+          });
+          return Object.entries(dias).map(([fecha, obj]) => ({
+            fecha, fechaFormateada: this.formatearFechaLocal(fecha),
+            Ambulatorio: obj.Ambulatorio.size || 0, 'Crónico': obj['Crónico'].size || 0,
+            Embarazada: obj.Embarazada.size || 0, 'Madre Lactante': obj['Madre Lactante'].size || 0, Total: obj.UnicosGlobal.size
+          })).sort((a,b) => a.fecha.localeCompare(b.fecha)); 
+        },
+
+        tablaDashboard() {
+          let tabla = {};
+          this.datosDashboard.filtrados.forEach(r => {
+            let med = r[6] ? String(r[6]).trim() : 'Desconocido';
+            let tipoNorm = this.normalizarTipo(r[5]);
+            let cant = Number(r[7]) || 0;
+            if(!tabla[med]) tabla[med] = { Ambulatorio: 0, 'Crónico': 0, Embarazada: 0, 'Madre Lactante': 0, Total: 0 };
+            if(tabla[med][tipoNorm] !== undefined) tabla[med][tipoNorm] += cant;
+            tabla[med].Total += cant;
+          });
+          return Object.entries(tabla).sort((a,b) => b[1].Total - a[1].Total);
+        },
+
+        // =====================================================================
+        // MÓDULO FINANCIERO CRÓNICOS
+        // Estructura Hoja: Triaje(0), Apellidos(1), Nombres(2), DiagAs(3), DiagNx(4), Fecha(5), Producto(6), Cantidad(7), Precio_Unit(8)
+        // =====================================================================
+        cronicosFiltrados() {
+           let targetMes = this.filtroCronicoMes;
+           let qPac = this.busquedaCronicoPaciente.toLowerCase();
+           let qDiag = this.busquedaCronicoDiag.toLowerCase();
+
+           return this.cronicos.map(c => {
+               // Extracción segura
+               let t = String(c[0]||'').trim();
+               let nC = (String(c[1]||'') + " " + String(c[2]||'')).trim();
+               let dAs = String(c[3]||'').trim();
+               let dNx = String(c[4]||'').trim();
+               let f = String(c[5]||'').trim();
+               let prod = String(c[6]||'').trim();
+               let cant = Number(c[7]) || 0;
+               let precUnit = sanitizarMoneda(c[8]); // Columna I: Precio Unitario
+               
+               let fMes = "";
+               if(f.includes('T')) fMes = f.substring(0,7);
+               else if(f.includes('-')) fMes = f.substring(0,7);
+
+               return {
+                  triaje: t, nombreCompleto: nC, diagAs: dAs, diagNx: dNx,
+                  fechaRaw: f, fechaStr: f ? this.formatearFechaLocal(f) : 'N/A', mesFila: fMes,
+                  producto: prod, cantidad: cant, precioUnitario: precUnit,
+                  gastoTotal: cant * precUnit
+               };
+           }).filter(obj => {
+               if(targetMes && obj.mesFila !== targetMes) return false;
+               if(qPac && !obj.triaje.toLowerCase().includes(qPac) && !obj.nombreCompleto.toLowerCase().includes(qPac)) return false;
+               if(qDiag && !obj.diagAs.toLowerCase().includes(qDiag) && !obj.diagNx.toLowerCase().includes(qDiag)) return false;
+               return true;
+           }).sort((a,b) => b.fechaRaw.localeCompare(a.fechaRaw)); // Orden cronológico descendente
+        },
+
+        metricasCronicos() {
+           let gastoTotal = 0;
+           let gastoPorPaciente = {};
+           
+           this.cronicosFiltrados.forEach(c => {
+               gastoTotal += c.gastoTotal;
+               if(!gastoPorPaciente[c.nombreCompleto]) gastoPorPaciente[c.nombreCompleto] = 0;
+               gastoPorPaciente[c.nombreCompleto] += c.gastoTotal;
+           });
+
+           let topPaciente = { nombre: '', gasto: 0 };
+           Object.entries(gastoPorPaciente).forEach(([nom, gast]) => {
+               if(gast > topPaciente.gasto) { topPaciente.nombre = nom; topPaciente.gasto = gast; }
+           });
+
+           return { gastoTotal, topPaciente };
+        }
+      },
+      watch: {
+        // AUTO-COLAPSAR MENÚ SIEMPRE PARA PANTALLA COMPLETA 
+        vistaActiva(val) { 
+          this.sidebarAbierto = false; 
+          if(val === 'DASHBOARD') this.$nextTick(() => this.renderizarGraficosDashboard()); 
+        },
+        tablaAfluenciaDiaria: { deep: true, handler() { if(this.vistaActiva === 'DASHBOARD') this.$nextTick(() => this.renderizarGraficosDashboard()); } }
+      },
+      methods: {
+        formatoMoneda(valor) {
+           return new Intl.NumberFormat('es-VE', { style: 'currency', currency: 'VES' }).format(valor);
+        },
+        moverFoco(targetId) { setTimeout(() => { document.getElementById(targetId)?.focus(); }, 10); },
+        
+        toggleFiltroInvMedicamento(m) {
+          const idx = this.filtroInvMedicamentos.indexOf(m);
+          if (idx >= 0) this.filtroInvMedicamentos.splice(idx, 1); else this.filtroInvMedicamentos.push(m);
+          this.busquedaInvMedicamento = '';
+        },
+        toggleFiltroPaciente(p) {
+          const idx = this.filtroDashPacientes.indexOf(p);
+          if (idx >= 0) this.filtroDashPacientes.splice(idx, 1); else this.filtroDashPacientes.push(p);
+          this.busquedaDashPaciente = '';
+        },
+        toggleFiltroMedicamento(m) {
+          const idx = this.filtroDashMedicamentos.indexOf(m);
+          if (idx >= 0) this.filtroDashMedicamentos.splice(idx, 1); else this.filtroDashMedicamentos.push(m);
+          this.busquedaDashMedicamento = '';
+        },
+        
+        normalizarTipo(tipo) {
+           if(!tipo) return 'Ambulatorio';
+           const t = String(tipo).toLowerCase().trim();
+           if(t === 'crónico' || t === 'cronico') return 'Crónico';
+           if(t === 'embarazada' || t === 'emb') return 'Embarazada';
+           if(t.includes('lactante') || t.includes('madre')) return 'Madre Lactante';
+           return 'Ambulatorio';
+        },
+        formatearFechaLocal(isoString) {
+           if(!isoString) return 'N/A';
+           let dateStr = String(isoString).trim();
+           if (dateStr.length === 10 && dateStr.indexOf('-') === 4) dateStr += "T00:00:00"; 
+           const d = new Date(dateStr);
+           return d.toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' });
+        },
+        
+        getLocalIsoDate() {
+          const d = new Date();
+          return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+        },
+
+        cargarDatos() {
+          this.cargando = true;
+          const localDate = new Date();
+          const mesBase = `${localDate.getFullYear()}-${(localDate.getMonth()+1).toString().padStart(2,'0')}`;
+          this.filtroDashMes = mesBase;
+          this.filtroCronicoMes = mesBase;
+
+          if (typeof google !== 'undefined' && google.script) {
+            google.script.run
+              .withSuccessHandler(data => {
+                this.pacientes = data.pacientes; 
+                this.inventario = data.inventario; 
+                this.registros = data.registros;
+                this.cronicos = data.cronicos || []; 
+                this.cargando = false;
+              }).obtenerDatosIniciales();
+          } else {
+            setTimeout(() => { this.cargando = false; }, 800);
+          }
+        },
+        
+        abrirModalLotes(grupo) {
+           this.productoActivoLote = grupo;
+           this.lotesTemporales = grupo.items.filter(i => Number(i[3]) > 0).map(i => {
+              let est = i[6] ? String(i[6]).trim().toUpperCase() : 'N/A';
+              if (est === 'PROXIMO A VENCER' || est === 'PRÓXIMO A VENCER') est = 'PRÓXIMOS A VENCER';
+              return {
+                codigo: i[0], lote: i[1], nombre: i[2], cantidadDisponible: Number(i[3]), unidad: i[4],
+                vencimiento: i[5] ? this.formatearFechaLocal(i[5]) : 'N/A', estado: est, cantidadAExtraer: ''
+              };
+           }).sort((a,b) => {
+              if(!a.vencimiento || a.vencimiento === 'N/A') return 1;
+              if(!b.vencimiento || b.vencimiento === 'N/A') return -1;
+              const aP = a.vencimiento.split('-'); const bP = b.vencimiento.split('-');
+              return new Date(`${aP[2]}-${aP[1]}-${aP[0]}`) - new Date(`${bP[2]}-${bP[1]}-${bP[0]}`);
+           });
+           
+           if(this.lotesTemporales.length === 0) return Swal.fire('Agotado', 'No hay inventario de este producto.', 'error');
+           this.mostrarModalLote = true;
+           setTimeout(() => { document.getElementById('lote-0')?.focus(); }, 100);
+        },
+
+        confirmarLotes() {
+           this.lotesTemporales.forEach(lt => {
+              const cant = Number(lt.cantidadAExtraer);
+              if(cant > 0) {
+                 if(cant > lt.cantidadDisponible) return Swal.fire('Error', `Estás intentando sacar más de lo disponible en el lote ${lt.lote}`, 'error');
+                 let existe = this.carrito.find(c => c.nombre === lt.nombre && c.lote === lt.lote);
+                 if(existe) existe.cantidad += cant;
+                 else this.carrito.push({ codigo: lt.codigo, nombre: lt.nombre, cantidad: cant, lote: lt.lote, unidad: lt.unidad });
+              }
+           });
+           this.mostrarModalLote = false; this.busquedaInventario = '';
+        },
+
+        // ⚡ GRÁFICOS PROTEGIDOS CON DEBOUNCE ⚡
+        renderizarGraficosDashboard() {
+          clearTimeout(chartTimeoutGlobal);
+          
+          chartTimeoutGlobal = setTimeout(() => {
+            // 1. Gráfico de Barras Afluencia Diaria
+            const ctxDiaria = document.getElementById('chartCurvaDiaria');
+            if(ctxDiaria) {
+                const sortedTabla = [...this.tablaAfluenciaDiaria];
+                const labelsD = sortedTabla.map(f => f.fechaFormateada.substring(0,5));
+                const dataD = sortedTabla.map(f => f.Total);
+
+                if (chartInstanceGlobal) chartInstanceGlobal.destroy();
+                chartInstanceGlobal = new Chart(ctxDiaria, {
+                  type: 'bar',
+                  data: {
+                    labels: labelsD,
+                    datasets: [{ label: 'Pacientes Únicos', data: dataD, backgroundColor: '#00457C', borderRadius: 4 }]
+                  },
+                  options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } } }
+                });
+            }
+
+            // 2. Gráfico de Pareto (Regla 80/20 de Consumos)
+            const ctxPareto = document.getElementById('chartParetoConsumo');
+            if(ctxPareto) {
+                let medsCount = {};
+                let totalCajas = 0;
+                this.datosDashboard.filtrados.forEach(r => {
+                   let m = r[6] ? String(r[6]).trim() : 'N/A';
+                   
+                   // ⚡ EXCLUSIÓN QUIRÚRGICA: Ignorar este producto solo para la gráfica de Pareto ⚡
+                   if (m.toUpperCase() === 'ALIMENTO SUPLEMENTARIO SOBRE GRAVE') return;
+                   
+                   let c = Number(r[7]) || 0;
+                   if(!medsCount[m]) medsCount[m] = 0;
+                   medsCount[m] += c;
+                   totalCajas += c;
+                });
+                
+                // Ordenar mayor a menor
+                let sortedMeds = Object.entries(medsCount).sort((a,b) => b[1] - a[1]);
+                let pLabels = []; let pBarras = []; let pLineaAcum = [];
+                let sumaAcumulada = 0;
+
+                sortedMeds.forEach(arr => {
+                   pLabels.push(arr[0].substring(0, 15) + '...'); // Nombre cortado
+                   pBarras.push(arr[1]);
+                   sumaAcumulada += arr[1];
+                   pLineaAcum.push(totalCajas > 0 ? ((sumaAcumulada / totalCajas) * 100).toFixed(1) : 0);
+                });
+
+                if (chartParetoGlobal) chartParetoGlobal.destroy();
+                chartParetoGlobal = new Chart(ctxPareto, {
+                  type: 'bar',
+                  data: {
+                    labels: pLabels,
+                    datasets: [
+                      { type: 'line', label: '% Acumulado', data: pLineaAcum, borderColor: '#ef4444', backgroundColor: '#ef4444', yAxisID: 'y1', tension: 0.3, borderWidth: 2 },
+                      { type: 'bar', label: 'Unidades Entregadas', data: pBarras, backgroundColor: '#F38B2B', yAxisID: 'y' }
+                    ]
+                  },
+                  options: { 
+                    responsive: true, maintainAspectRatio: false,
+                    scales: {
+                       y: { type: 'linear', display: true, position: 'left', title: { display: true, text: 'Unidades' } },
+                       y1: { type: 'linear', display: true, position: 'right', grid: { drawOnChartArea: false }, max: 100, min: 0, title: { display: true, text: '% Acumulado' } }
+                    }
+                  }
+                });
+            }
+          }, 300);
+        },
+
+        analizarPegado() {
+          if(!this.textoPegadoInventario) { this.datosIngresoPreview = []; return; }
+          const lineas = this.textoPegadoInventario.trim().split('\n');
+          this.datosIngresoPreview = [];
+          lineas.forEach(linea => {
+            const cols = linea.split('\t');
+            if(cols.length >= 4) {
+              const cant = parseInt(cols[3]?.trim()) || 0;
+              if (cant > 0) { 
+                 this.datosIngresoPreview.push({ codigo: cols[0]?.trim()||'', lote: cols[1]?.trim()||'S/L', nombre: cols[2]?.trim()||'Desconocido', cantidad: cant, unidad: cols[4]?.trim()||'UND', vencimiento: cols[5]?.trim()||'', estado: cols[6]?.trim()||'VIGENTE' });
+              }
+            }
+          });
+        },
+
+        confirmarIngresoInventario() {
+          if (this.datosIngresoPreview.length === 0) return;
+          Swal.fire({ title: 'Ingresar?', text: `Se procesarán ${this.datosIngresoPreview.length} filas.`, icon: 'question', showCancelButton: true, confirmButtonColor: '#10b981' }).then((result) => {
+            if (result.isConfirmed) {
+              this.procesandoIngreso = true;
+              if (typeof google !== 'undefined' && google.script) {
+                google.script.run.withSuccessHandler(res => {
+                  this.procesandoIngreso = false; Swal.fire('¡Éxito!', res.message, 'success');
+                  this.textoPegadoInventario = ''; this.datosIngresoPreview = []; this.cargarDatos();
+                }).ingresarInventario(this.datosIngresoPreview);
+              }
+            }
+          });
+        },
+
+        seleccionarPaciente(p) {
+          this.pacienteSeleccionado = { id: p[0], apellidos: p[1], nombres: p[2], nombreCompleto: (p[1] + " " + p[2]).trim(), tipo: p[3], diagnosticoNx: p[4], diagnosticoAs: p[5] };
+          this.busquedaPaciente = '';
+        },
+
+        async guardarNuevoPaciente() {
+          if(!this.nuevoPaciente.id || !this.nuevoPaciente.nombres || !this.nuevoPaciente.apellidos) return Swal.fire('Error', 'Campos obligatorios vacíos.', 'warning');
+          
+          // ⚡ PROTECCIÓN TRIAJE DUPLICADO ⚡
+          const idBuscado = String(this.nuevoPaciente.id).trim();
+          if (this.pacientes.some(p => String(p[0]).trim() === idBuscado)) {
+             return Swal.fire('Triaje Duplicado', `El número de triaje ${idBuscado} ya se encuentra registrado en el sistema.`, 'error');
+          }
+
+          this.guardandoPaciente = true;
+          if (typeof google !== 'undefined' && google.script) {
+            google.script.run.withSuccessHandler(res => {
+                this.guardandoPaciente = false;
+                if(res.success) {
+                  this.pacientes.unshift(res.data); this.mostrarModalPaciente = false; this.seleccionarPaciente(res.data);
+                  this.nuevoPaciente = { id: '', nombres: '', apellidos: '', tipo: 'Ambulatorio', diagnosticoNx: '', diagnosticoAs: '' };
+                } else Swal.fire('Error', res.message, 'error');
+              }).agregarPaciente(this.nuevoPaciente);
+          } else {
+             // Mockup test si no hay GS
+             setTimeout(() => { this.guardandoPaciente = false; }, 1000);
+          }
+        },
+
+        abrirConfirmacion() { 
+          const nombrePaciente = this.pacienteSeleccionado.nombreCompleto.toLowerCase();
+          const mesActual = this.filtroDashMes; 
+          
+          let yaVino = false;
+          let mensajeAlerta = "";
+
+          for(let i=0; i < this.registros.length; i++) {
+             const r = this.registros[i];
+             let mesFila = "";
+             if (r[11]) {
+                mesFila = String(r[11]).trim();
+                if (mesFila.includes('T')) mesFila = mesFila.substring(0, 7);
+                else if (mesFila.includes('-')) mesFila = mesFila.substring(0, 7);
+             }
+
+             if(mesFila === mesActual && r[3] && String(r[3]).toLowerCase() === nombrePaciente) {
+                yaVino = true;
+                mensajeAlerta = `<div class="bg-red-100 text-red-700 p-3 rounded-lg mb-4 text-xs font-bold border border-red-200">
+                                   <i class="fa-solid fa-triangle-exclamation mr-1"></i> ¡Atención! Este paciente ya tiene registros de entrega en el mes actual.
+                                 </div>`;
+                break;
+             }
+          }
+
+          let htmlResumen = `<ul class="text-left text-sm space-y-1 mb-4">`;
+          this.carrito.forEach(p => {
+             htmlResumen += `<li><i class="fa-solid fa-check text-cania-green mr-2"></i><b>${p.cantidad}</b> x ${p.nombre} <br><span class="text-xs text-slate-500 ml-6">Lote: ${p.lote}</span></li>`;
+          });
+          htmlResumen += `</ul>`;
+
+          Swal.fire({
+            title: yaVino ? 'Posible Duplicidad' : '¿Confirmar Entrega?',
+            html: `<div class="text-left">
+                     ${mensajeAlerta}
+                     <p class="mb-2"><b class="text-cania-blue">Paciente:</b> ${this.pacienteSeleccionado.nombreCompleto}</p>
+                     <p class="mb-4"><b class="text-cania-blue">Modalidad:</b> ${this.modalidadEntrega === 'NO' ? 'Presencial' : 'A distancia'}</p>
+                     <p class="font-bold text-slate-700 mb-2 border-b pb-1">Productos a entregar:</p>
+                     ${htmlResumen}
+                   </div>`,
+            icon: yaVino ? 'warning' : 'question',
+            showCancelButton: true,
+            confirmButtonColor: yaVino ? '#ef4444' : '#F38B2B', 
+            cancelButtonColor: '#e2e8f0',
+            cancelButtonText: '<span class="text-slate-700 font-bold">Cancelar</span>',
+            confirmButtonText: yaVino ? 'Registrar de todos modos' : 'Sí, registrar salida'
+          }).then((result) => {
+            if (result.isConfirmed) {
+              this.procesarRegistro();
+            }
+          });
+        },
+
+        procesarRegistro() {
+          this.procesando = true;
+          if (typeof google !== 'undefined' && google.script) {
+            
+            // ⚡ ARREGLO DE SERIALIZACIÓN VUE 3: Quitamos el escudo "Proxy" a los datos para que Google no colapse
+            const payloadPaciente = JSON.parse(JSON.stringify(this.pacienteSeleccionado));
+            const payloadCarrito = JSON.parse(JSON.stringify(this.carrito));
+
+            google.script.run.withSuccessHandler(res => {
+                this.procesando = false; 
+                
+                // ⚡ TRAMPA DE ERRORES: Si el backend falla, ahora TE LO AVISA con alerta roja!
+                if(res && res.success === false) {
+                   Swal.fire('Error al Guardar en Excel', res.message, 'error');
+                } else {
+                   Swal.fire({ title: '¡Registrado!', icon: 'success', timer: 1500, showConfirmButton: false });
+                   this.pacienteSeleccionado = null; 
+                   this.carrito = []; 
+                   this.cargarDatos();
+                }
+              }).withFailureHandler(err => {
+                 this.procesando = false; 
+                 Swal.fire('Fallo de Conexión', err.message, 'error');
+              }).guardarConsumo(payloadPaciente, this.modalidadEntrega, this.fechaEntregaGlobal, payloadCarrito);
+          }
+        },
+
+        sumarCantidad(idx) { this.carrito[idx].cantidad++; },
+        restarCantidad(idx) { if(this.carrito[idx].cantidad > 1) this.carrito[idx].cantidad--; },
+        quitarDelCarrito(idx) { this.carrito.splice(idx, 1); }
+      },
+      mounted() {
+        this.fechaEntregaGlobal = this.getLocalIsoDate();
+        const localDate = new Date();
+        const m = `${localDate.getFullYear()}-${(localDate.getMonth()+1).toString().padStart(2,'0')}`;
+        this.filtroDashMes = m;
+        this.filtroCronicoMes = m;
+        this.cargarDatos(); 
+      }
+    }).mount('#app');
+  </script>
+</body>
+</html>
